@@ -1,0 +1,125 @@
+# Board: M5Stack AtomS3R
+substitutions:
+  device_name: atom-s3r
+  id_name: atom-s3r
+  device_prettyname: "Atom S3R"
+
+esphome:
+  name: ${device_name}
+  friendly_name: ${device_prettyname}
+  on_boot:
+    priority: 900.0
+    then:
+      - delay: 50ms
+      - lambda: |-
+          id(atom_backlight).write_byte(0x00, 0x40);
+      - delay: 10ms
+      - lambda: |-
+          id(atom_backlight).write_byte(0x08, 0x01);
+          id(atom_backlight).write_byte(0x70, 0x00);
+          id(atom_backlight).write_byte(0x0E, 0x7F);
+      - delay: 20ms
+      - lambda: |-
+          id(atom_backlight).write_byte(0x0E, 0xFF);
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: esp-idf
+
+psram:
+  mode: octal
+
+logger:
+  level: DEBUG
+    
+spi:
+  clk_pin: GPIO15
+  mosi_pin: GPIO21
+
+i2c:
+  id: atom_i2c
+  sda: GPIO45
+  scl: GPIO0
+  scan: false
+
+i2c_device:
+  id: atom_backlight
+  i2c_id: atom_i2c
+  address: 0x30
+
+font:
+  - file: "fonts/Arial.ttf"
+    id: status_font
+    size: 18
+  - file: "fonts/Arial.ttf"
+    id: small_font
+    size: 12
+
+globals:
+  - id: display_preset
+    type: int
+    restore_value: true
+    initial_value: '0'
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO41
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    id: atom_button
+    name: "Atom Button"
+    filters:
+      - delayed_on: 20ms
+    on_press:
+      then:
+        - lambda: |-
+            ESP_LOGI("display", "Button pressed"));
+
+display:
+  - platform: mipi_spi
+    model: ST7735
+    cs_pin: GPIO14
+    dc_pin: GPIO42
+    reset_pin: GPIO48
+    dimensions:
+      width: 128
+      height: 128
+      offset_width: 0
+      offset_height: 0
+    data_rate: 8MHz
+    color_order: BGR
+    invert_colors: true
+    update_interval: 2s
+    rotation: 0
+    lambda: |-
+      const int left = 3;
+      const int top = 3;
+      const int right = 3;
+      const int bottom = 3;
+
+      int x0 = left;
+      int y0 = top;
+      int x1 = it.get_width() - 1 - right;
+      int y1 = it.get_height() - 1 - bottom;
+
+      it.fill(Color::BLACK);
+      if (x1 > x0 && y1 > y0) {
+        it.filled_rectangle(x0, y0, x1 - x0 + 1, y1 - y0 + 1, Color(0, 0, 255));
+        it.line(x0, y0, x1, y0, Color(255, 0, 0));
+        it.line(x0, y0 + 1, x1, y0 + 1, Color(255, 0, 0));
+        it.line(x0, y1, x1, y1, Color(255, 0, 0));
+        it.line(x0, y1 - 1, x1, y1 - 1, Color(255, 0, 0));
+        it.line(x0, y0, x0, y1, Color(255, 0, 0));
+        it.line(x0 + 1, y0, x0 + 1, y1, Color(255, 0, 0));
+        it.line(x1, y0, x1, y1, Color(255, 0, 0));
+        it.line(x1 - 1, y0, x1 - 1, y1, Color(255, 0, 0));
+      }
+
+      it.printf(8, 8, id(status_font), Color::WHITE, "Atom S3R");
+      it.printf(8, 28, id(small_font), Color::WHITE, "L%d T%d", left, top);
+      it.printf(8, 48, id(small_font), Color::WHITE, "R%d B%d", right, bottom);
+
