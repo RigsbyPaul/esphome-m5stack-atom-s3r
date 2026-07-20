@@ -77,7 +77,7 @@ binary_sensor:
     on_press:
       then:
         - lambda: |-
-            ESP_LOGI("display", "Button pressed"));
+            ESP_LOGI("display", "Button pressed");
 
 display:
   - platform: mipi_spi
